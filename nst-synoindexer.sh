@@ -21,55 +21,77 @@ fi
 
 usage() {
 	cat <<EOF
-Usage: $0 [-d dir] [-h] [-i index_cmd] [-n] [-r file] [-t] 
+Usage: $0 [-c] [-d dir] [-h] [-i index_cmd] [-n] [-r file] [-t] 
+	-c	: create reference file $TIMESTAMPFILE
 	-d dir	: use Video directory 'dir' instead of default $VIDEODIR
+	-f n	: force indexing of files since last 'n' days
 	-h	: show this help
 	-i index_cmd	: use 'index_cmd' instead of default $INDEXCMD (must accept -a <file> as argument)
 	-n	: do NOT change the timestamp of reference file $TIMESTAMPFILE
 	-r file	: set reference file to 'file' instead of default $TIMESTAMPFILE
+	-s	: silent mode (otherwise, indexed files are shown)
 	-t	: test only, echoes the commands, don't run them
-	-v	: verbose (show files indexed)
 EOF
 	exit 0
 }
 
 TEST=""
 NOT=0
-VERBOSE=""
+VERBOSE="-print"
+DAYS="zzz"
+CREATE="no"
 
-while getopts "d:hi:nr:tv" opt; do
+while getopts "cd:f:hi:nr:st" opt; do
 	case $opt in 
+	c) CREATE="yes";;
 	d) VIDEODIR=$OPTARG;;
+	f) DAYS=$OPTARG;;
 	h) usage;;
 	i) INDEXCMD=$OPTARG;;
 	n) NOT=1;;
 	r) TIMESTAMPFILE=$OPTARG;;
+	s) VERBOSE="";;
 	t) TEST=echo;;
-	v) VERBOSE="-print0";;
 	\?) usage;;
 	esac
 done
 
 FINDEXEC="$INDEXCMD -a {}"
 
+# check existence of synoindex
 if [ ! -x $INDEXCMD ]; then
 	echo "Error: '$INDEXCMD' doesn't exist, unable to run script."
 	exit 1
 fi
 
-if [ ! -e $TIMESTAMPFILE ]; then
-	echo "Error: $TIMESTAMPFILE doesn't exist. Create it first and predate it using 'touch -d XXX $TIMESTAMPFILE'."
-	exit 1
+# create reference file is asked for. If -t, then echo instead of doing it.
+if [ $CREATE = "yes" ]; then
+	$TEST touch $TIMESTAMPFILE
 fi
 
+# if not forced days, then check existence of reference file
+if [ "$DAYS" = "zzz" ]; then
+	if [ ! -e $TIMESTAMPFILE ]; then
+		echo "Error: $TIMESTAMPFILE doesn't exist. Create it first using option '-c'."
+		exit 1
+	fi
+fi
+
+# check existence of video directory
 if [ ! -d $VIDEODIR ]; then
 	echo "Error: $VIDEODIR doesn't exist. Use option '-d dir' to create it."
 	exit 1
 fi
 
-$TEST find $VIDEODIR -type f -newer $TIMESTAMPFILE \! $IGNORE $VERBOSE -exec $FINDEXEC \;
+# if not forced days, use reference file, otherwise use -mtime -$DAYS for find(1).
+if [ "$DAYS" = "zzz" ]; then
+	$TEST find $VIDEODIR -type f -newer $TIMESTAMPFILE \! $IGNORE $VERBOSE -exec $FINDEXEC \;
+else
+	$TEST find $VIDEODIR -type f -mtime -$DAYS \! $IGNORE $VERBOSE -exec $FINDEXEC \;
+fi
 
-if [ "x$NOT" != "x0" ]; then
+# if ask to NOT touch, then, well, do nothing (echo), instead (default): touch reference file.
+if [ $NOT != "0" ]; then
 	echo "$TIMESTAMPFILE not touched."
 else
 	touch $TIMESTAMPFILE

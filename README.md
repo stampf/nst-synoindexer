@@ -1,4 +1,4 @@
-=nst-synoindexer.sh=
+# nst-synoindexer.sh
 
 This script will index new video files on your Synology since the last time you run it.
 
