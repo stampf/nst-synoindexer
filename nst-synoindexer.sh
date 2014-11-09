@@ -5,9 +5,6 @@
 # Change these to reflect your own configuration
 VIDEODIR="/volume1/video"
 
-# change this one to reject some filenames from the find. See man find(1) for usage. Used after a "\!"
-IGNORE="-name '*download'"
-
 # You shouldn't touch anything after this line
 TIMESTAMPFILE="/var/run/nst-synoindex.timestamp"
 INDEXCMD="/usr/syno/bin/synoindex"
@@ -35,7 +32,7 @@ EOF
 	exit 0
 }
 
-TEST=""
+TEST=0
 NOT=0
 VERBOSE="-print"
 DAYS="zzz"
@@ -51,12 +48,17 @@ while getopts "cd:f:hi:nr:st" opt; do
 	n) NOT=1;;
 	r) TIMESTAMPFILE=$OPTARG;;
 	s) VERBOSE="";;
-	t) TEST=echo;;
+	t) TEST=1;;
 	\?) usage;;
-	esac
+	esac	
 done
 
-FINDEXEC="$INDEXCMD -a {}"
+if [ $TEST = 1 ]; then
+	FINDEXEC=""
+	VERBOSE="-print"
+else
+	FINDEXEC="-exec $INDEXCMD -a {} \;"
+fi
 
 # check existence of synoindex
 if [ ! -x $INDEXCMD ]; then
@@ -85,9 +87,9 @@ fi
 
 # if not forced days, use reference file, otherwise use -mtime -$DAYS for find(1).
 if [ "$DAYS" = "zzz" ]; then
-	$TEST find $VIDEODIR -type f -newer $TIMESTAMPFILE \! $IGNORE $VERBOSE -exec $FINDEXEC \;
+	/usr/bin/find $VIDEODIR -type f -newer $TIMESTAMPFILE ! -regex '.*@eaDir.*' ! -name '*crdownload' $VERBOSE $FINDEXEC
 else
-	$TEST find $VIDEODIR -type f -mtime -$DAYS \! $IGNORE $VERBOSE -exec $FINDEXEC \;
+	/usr/bin/find $VIDEODIR -type f -mtime -$DAYS ! -regex '.*@eaDir.*' ! -name '*crdownload' $VERBOSE $FINDEXEC
 fi
 
 # if ask to NOT touch, then, well, do nothing (echo), instead (default): touch reference file.
